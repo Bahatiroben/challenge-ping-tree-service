@@ -2,15 +2,15 @@ var bl = require('bl')
 var fs = require('fs')
 var path = require('path')
 var sampleData = {
-  "url": "http://example.com",
-  "value": "0.50",
-  "maxAcceptsPerDay": "10",
-  "accept": {
-      "geoState": {
-          "$in": ["ca", "ny"]
+  'url': 'http://example.com',
+  'value': '0.50',
+  'maxAcceptsPerDay': '10',
+  'accept': {
+      'geoState': {
+          '$in': ['ca', 'ny']
       },
-        "hour": {
-          "$in": [ "13", "14", "15" ]
+        'hour': {
+          '$in': [ '13', '14', '15' ]
         }
   }
 }
@@ -49,7 +49,7 @@ test.serial.cb('post a target', function (t) {
 
 test.serial.cb('get all targets', function (t) {
   var url = '/api/targets'
-  const redis = require('../lib/redis');
+  const redis = require('../lib/redis')
   redis.hmset('targets', [1, JSON.stringify({id: 1, ...sampleData})])
   servertest(server(), url, { encoding: 'json', method: 'GET' }, function (err, res) {
     t.falsy(err, 'no error')
@@ -62,7 +62,7 @@ test.serial.cb('get all targets', function (t) {
 
 test.serial.cb('get target by id', function (t) {
   var url = '/api/target/1'
-  const redis = require('../lib/redis');
+  const redis = require('../lib/redis')
   redis.hmset('targets', [1, JSON.stringify({id: 1, ...sampleData})])
   servertest(server(), url, { encoding: 'json', method: 'GET' }, function (err, res) {
     t.falsy(err, 'no error')
@@ -75,8 +75,8 @@ test.serial.cb('get target by id', function (t) {
 
 test.serial.cb('returns 404 when it misses a target during get target by id', function (t) {
   var url = '/api/target/x1_'
-  const redis = require('../lib/redis');
-  redis.hmset('targets', [1, JSON.stringify({id: 1, ...sampleData})])
+  const redis = require('../lib/redis')
+  redis.hmset('targets', [1, JSON.stringify({ id: 1, ...sampleData})])
   servertest(server(), url, { encoding: 'json', method: 'GET' }, function (err, res) {
     t.falsy(err, 'no error')
     t.is(res.statusCode, 404, 'correct statusCode')
@@ -85,12 +85,44 @@ test.serial.cb('returns 404 when it misses a target during get target by id', fu
   })
 })
 
-test.serial.cb('invalid method', function (t) {
-  var url = '/api/targets'
-  servertest(server(), url, { encoding: 'json', method: 'PUT' }, function (err, res) {
+test.serial.cb('update a target by ID', function (t) {
+  var url = 'api/target/1'
+  var serverStream = servertest(server(), url, { encoding: 'json', method: 'POST' })
+  fs.createReadStream(path.join(__dirname, '/targetUpdate.json')).pipe(serverStream)
+
+  serverStream.pipe(bl(function (err, data) {
     t.falsy(err, 'no error')
-    t.is(res.statusCode, 405, 'correct statusCode')
-    t.is(res.body.message, 'Invalid method used', 'status is for invalid method')
+    var stringData = data.toString()
+    var res = JSON.parse(stringData)
+    t.is(res.message, 'target updated suceessfully')
     t.end()
-  })
+  }))
+})
+
+test.serial.cb('returns 404 when it misses a target during UPDATE target by id', function (t) {
+  var url = '/api/target/x1_'
+  var serverStream = servertest(server(), url, { encoding: 'json', method: 'POST' })
+  fs.createReadStream(path.join(__dirname, '/targetUpdate.json')).pipe(serverStream)
+
+  serverStream.pipe(bl(function (err, data) {
+    t.falsy(err, 'no error')
+    var stringData = data.toString()
+    var res = JSON.parse(stringData)
+    t.is(res.message, 'target not found')
+    t.end()
+  }))
+})
+
+test.serial.cb('invalid method', function (t) {
+  var url = 'api/targets'
+  var serverStream = servertest(server(), url, { encoding: 'json', method: 'PATCH' })
+  fs.createReadStream(path.join(__dirname, '/targetUpdate.json')).pipe(serverStream)
+
+  serverStream.pipe(bl(function (err, data) {
+    t.falsy(err, 'no error')
+    var stringData = data.toString()
+    var res = JSON.parse(stringData)
+    t.is(res.message, 'Invalid method used')
+    t.end()
+  }))
 })
